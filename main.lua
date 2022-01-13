@@ -73,6 +73,8 @@ function love.keypressed( key, scancode, isrepeat )
         hs = hs + 1
         if hs > #fnt.hopts then hs = 1 end
         fnt:setHinting(hs)
+    elseif key == 'escape' then
+        love.event.quit()
     elseif key == 'space' then
         love.system.setClipboardText(fnt:emit())
     end
