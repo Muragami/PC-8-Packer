@@ -42,8 +42,8 @@ w, h = fnt:getDimensions(str, downward)
 Returns the dimensions of the block that contains the output text in respect to downward flags.
 
 ```lua
-function fnt:setPalette(p)
-p = function fnt:getPalette()
+fnt:setPalette(p)
+p = fnt:getPalette()
 ```
 
 Get access to, or set the internal palette used by print(). The font comes with a built-in 
