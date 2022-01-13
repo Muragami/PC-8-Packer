@@ -8,7 +8,7 @@ font file that draws the font. This repo includes all the fonts of the
 ## Application Usage
 
 Everything is spelled out at the top of the screen, check it out!
-
+![pc-8](https://user-images.githubusercontent.com/38527452/149370663-f6861c29-e4ca-47ff-84f9-260abd767fa6.png)
 
 Here is the quick and dirty usage of the output source code:
 
