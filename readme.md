@@ -68,7 +68,9 @@ fnt:print(str,x,y,dontcolor,downward)
 
 Draws the string or color table string (see LÖVE docs) at coords: x,y. If dontcolor is
 set, ignore colors sent in the table. If downward is set, draw each character downward
-instead of across.
+instead of across. Unlike the format of the color table from LÖVE, you can also just pass
+a number as a color palette entry: { 15, "some text", 4, "some other text"}. 
+setPalette/getPalette let you adjust/replace the internal CGA 16 color palette as you desire.
 
 ```lua
 fnt:printTexture(str,dontcolor,downward)
