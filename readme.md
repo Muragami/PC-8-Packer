@@ -2,8 +2,8 @@
 
 A minimal [LÖVE](https://love2d.org) application that renders the CP437 (PC-8)
 characters of a unicode ttf, and allows you to pack that into a lua source
-font file that draws the font. This repo includes all the fonts of the
-[int10h Ultimate Oldschool PC Font Pack 2.2](https://int10h.org/oldschool-pc-fonts/).
+font file that draws the font (or a C language file, or a JSON data file). 
+This repo includes all the fonts of the [int10h Ultimate Oldschool PC Font Pack 2.2](https://int10h.org/oldschool-pc-fonts/).
 Given you have LÖVE installed on your desktop, you should be able to download and
 run the PC-8 Packer.love in the repo. It is built against 11.4, but I think it
 should work on 11.0 or better.
@@ -88,9 +88,22 @@ Draws the character string (1st character) or CP437 entry number (type(cv) == 'n
 the coords: x,y. Minimalist function, should be fast and compile down in luajit given jit is
 enabled.
 
-## Current Limitations
+## C output format
 
-The output routine expects mono hinting because it outputs encoded bit data for the font
-into the generated file. I expect to add another output option later that will just export
-a PNG of the font with a custom block at the end containing the lua code to use it, and that
-will support shades of grey and other hinting modes.
+If you select .c output format, it creates a C language source file that can fill a
+bitmap with the encoded font data, plus the font character width and height. The font
+bitmap is width * 32 wide and height * 8 tall (a 32x8 matrix of 0-255 characters
+starting on the top left). 
+
+## JSON output format
+
+If you select JSON output format, it creates a .json data file with the font name,
+width, and height, plus an array of strings that make up the ascii encoded 1 bit data
+for the font.
+
+## 6-bit encoded data
+
+The bitmap bits are encoded as 24 image bits into 4 eight bit ascii characters. The process
+to decode them is very simple: subtract 48 from the ascii character value, and if that results
+in -1 that means the value is 44 (catch and replace). Then you have a 6 bit value to pull
+the pixel values from. Repeat over every 4 eight byte values until each line is decoded.
