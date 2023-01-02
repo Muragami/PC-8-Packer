@@ -10,7 +10,15 @@ io.stdout:setvbuf("no") -- let the output show in sublime text editor
 
 fnt = require 'fnt'
 
-usage = "usage: <up>/<down> change font - <left>/<right> change size - <tab> change hinting - <space> emit lua font to clipboard"
+usageA = "usage: <up>/<down> change font - <left>/<right> change size - <tab> change hinting - <space> emit lua font to clipboard"
+usageB = "       <1..3> emit font to clipboard: 1 = lua, 2 = C, 3 = JSON"
+
+local function prnt(g, txt, x, y)
+    g.setColor(0.0, 0.0, 0.0, 1.0)
+    g.print(txt, x, y)
+    g.setColor(1.0, 1.0, 1.0, 1.0)
+    g.print(txt, x + 1, y + 1)
+end
 
 function love.load()
     fnt:load("font/")
@@ -18,7 +26,7 @@ function love.load()
     sz = 16
     hs = 4
     fnt:select(snum)
-    guiFont = love.graphics.newFont("font/Mx437_Compaq_Port3.ttf",16)
+    guiFont = love.graphics.newFont("font/Mx437_Compaq_Port3.ttf", 16)
 end
 
 function love.update(dt)
@@ -29,22 +37,21 @@ function love.draw()
     local info = tostring(snum) .. "/" .. #fnt.list .. ": " .. fname .. " at size: " .. fnt.size .. " Hinting: " .. fnt.hinting .. " | width=" .. fnt.wid
     local g = love.graphics
     g.setFont(guiFont)
-    g.setColor(0.3,0.3,0,1.0)
-    g.rectangle('fill',0,0,1000,20)
-    g.setColor(0.5,0,0,1.0)
-    g.rectangle('fill',0,20,1000,20)
-    g.setColor(0.0,0.0,0.0,1.0)
-    g.print(usage,1,1)
-    g.setColor(1.0,1.0,1.0,1.0)
-    g.print(usage,2,2)
-    g.setColor(0.0,0.0,0.0,1.0)
-    g.print(info,1,21)
-    g.setColor(1.0,1.0,1.0,1.0)
-    g.print(info,2,22)
-    fnt:draw(10,64, 1.0)
+    g.setColor(0.3, 0.3, 0, 1.0)
+    g.rectangle('fill', 0, 0, 1000, 40)
+    g.setColor(0.5, 0, 0, 1.0)
+    g.rectangle('fill', 0, 40, 1000, 20)
+    
+    prnt(g, usageA, 1, 1)
+    
+    prnt(g, usageB, 1, 21)
+
+    prnt(g, info, 1, 41)
+    
+    fnt:draw(10, 71, 1.0)
 end
 
-function love.keypressed( key, scancode, isrepeat )
+function love.keypressed(key, scancode, isrepeat )
     if key == 'up' then
         snum = snum - 1
         if snum < 1 then snum = #fnt.list end
@@ -75,7 +82,11 @@ function love.keypressed( key, scancode, isrepeat )
         fnt:setHinting(hs)
     elseif key == 'escape' then
         love.event.quit()
-    elseif key == 'space' then
-        love.system.setClipboardText(fnt:emit())
+    elseif key == '1' then
+        love.system.setClipboardText(fnt:emit('lua'))
+    elseif key == '2' then
+        love.system.setClipboardText(fnt:emit('C'))
+    elseif key == '3' then
+        love.system.setClipboardText(fnt:emit('JSON'))
     end
 end

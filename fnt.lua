@@ -8,7 +8,7 @@
 
 require 'pc-8'
 
-local fnt = { list = {}, index = {}, hopts = { 'normal', 'light', 'mono', 'none' }, 
+local fnt = { list = {}, index = {}, name = {}, hopts = { 'normal', 'light', 'mono', 'none' }, 
         size = 16, hinting = 'none', dir = "/", wid = 8, cp437_native = true }
 
 
@@ -26,6 +26,7 @@ fnt.load = function(self,dir)
         if ends_with(file,".ttf") then
             self.list[k] = dir .. file
             self.index[file] = dir .. file
+            self.name[k] = file:sub(1, #file - 4)
         end
     end
     self.dir = dir
@@ -46,6 +47,7 @@ fnt.select = function(self,x)
     local sel
     if type(x) == 'number' then
         sel = self.list[x]
+        self.nsel = x
     else
         sel = self.index[x]
     end
@@ -90,55 +92,56 @@ fnt.draw = function(self,dx,dy,scale)
 end
 
 -- emit a lua file for this font!
-fnt.emit = function(self)
+fnt.emit = function(self, lang)
     -- make sure we are in mono mode
     self:setHinting(3)
     -- first draw to a canvas so we can get the texture later
-    local w = 32 * (self.wid+1)
+    local w = 32 * (self.wid + 1)
     local h = 8 * self.size
-    if math.fmod(w,24) > 0 then w = (math.floor(w/24) + 1) * 24 end -- make sure we are 24 pixel aligned for our encoding below!
+    if math.fmod(w, 24) > 0 then w = (math.floor(w / 24) + 1) * 24 end -- make sure we are 24 pixel aligned for our encoding below!
     local c = love.graphics.newCanvas(w, h)
     love.graphics.setCanvas(c)
-    self:draw(0,0,1.0)
+    self:draw(0, 0, 1.0)
     love.graphics.setCanvas()
     local id = c:newImageData()
-    id:encode('png','test.png')
 
     local t = {}
     local l = {}
-    local function ti(str) table.insert(t,str) end
-    ti("local fnt = { name = '" .. self.sel .. "', height = " .. tostring(self.size) .. ", width = " .. tostring(self.wid) .. ", \n")
-    ti("\tbit = {\n")
-    local pos = 0
-    local bpos = 1
-    local v = 0
-    for y=1, h, 1 do
-        for x=1, w, 1 do
-            local pr, pg, pb, pa = id:getPixel(x-1, y-1)
-            if pa > 0.9 then
-                v = v + bit.lshift(1,pos)
-            end
-            pos = pos + 1
-            if pos == 6 then
-                if v + 48 == 0x5C then 
-                    l[bpos] = string.char(0x2F)
-                else 
-                    l[bpos] = string.char(v + 48)
+    local function ti(str) table.insert(t, str) end
+
+    if lang == 'lua' then
+        ti("local fnt = { name = '" .. self.sel .. "', height = " .. tostring(self.size) .. ", width = " .. tostring(self.wid) .. ", \n")
+        ti("\tbit = {\n")
+        local pos = 0
+        local bpos = 1
+        local v = 0
+        for y=1, h, 1 do
+            for x=1, w, 1 do
+                local pr, pg, pb, pa = id:getPixel(x-1, y-1)
+                if pa > 0.9 then
+                    v = v + bit.lshift(1,pos)
                 end
-                pos = 0
-                v = 0
-                bpos = bpos + 1
-                if bpos == 121 then
-                    ti("\t'" .. table.concat(l) .. "',\n")
-                    bpos = 1
-                    l = {}
+                pos = pos + 1
+                if pos == 6 then
+                    if v + 48 == 0x5C then 
+                        l[bpos] = string.char(0x2F)
+                    else 
+                        l[bpos] = string.char(v + 48)
+                    end
+                    pos = 0
+                    v = 0
+                    bpos = bpos + 1
+                    if bpos == 121 then
+                        ti("\t'" .. table.concat(l) .. "',\n")
+                        bpos = 1
+                        l = {}
+                    end
                 end
             end
         end
-    end
-    if bpos > 1 then ti("\t'" .. table.concat(l) .. "',\n") end
-    ti("\t} }\n")
-    ti([[
+        if bpos > 1 then ti("\t'" .. table.concat(l) .. "',\n") end
+        ti("\t} }\n")
+        ti([[
 local w, h = 32 * (fnt.width+1), 8 * fnt.height
 if math.fmod(w,24) > 0 then w = (math.floor(w/24) + 1) * 24 end
 local id = love.image.newImageData(w, h)
@@ -296,8 +299,147 @@ end
 
 return fnt
 ]])
+    elseif lang == 'C' then
+        ti([[
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+
+#ifndef __fnt__
+#define __fnt__
+typedef struct _fnt {
+    unsigned char *bits;
+    int w;
+    int h;
+} fnt;
+#endif
+
+]])
+        ti("const fnt " .. self.name[self.nsel] .. " = { (unsigned char*)\n")
+        local pos = 0
+        local bpos = 1
+        local v = 0
+        for y=1, h, 1 do
+            for x=1, w, 1 do
+                local pr, pg, pb, pa = id:getPixel(x-1, y-1)
+                if pa > 0.9 then
+                    v = v + bit.lshift(1,pos)
+                end
+                pos = pos + 1
+                if pos == 6 then
+                    if v + 48 == 0x5C then 
+                        l[bpos] = string.char(0x2F)
+                    else 
+                        l[bpos] = string.char(v + 48)
+                    end
+                    pos = 0
+                    v = 0
+                    bpos = bpos + 1
+                    if bpos == 121 then
+                        ti("\t\"" .. table.concat(l) .. "\"\n")
+                        bpos = 1
+                        l = {}
+                    end
+                end
+            end
+        end
+        if bpos > 1 then ti("\t\"" .. table.concat(l) .. "\"\n") end
+        ti("\t, " .. tostring(self.wid) .. "\n")
+        ti("\t, " .. tostring(self.size) .. " };\n\n")
+        ti([[
+const char* fnt_fill(const fnt *f, unsigned char **dest, int *dw, int *dh, unsigned int on, unsigned int off, unsigned int bpp)
+{
+    const unsigned char *ps = f->bits;
+    int w, h, llen, blen, val;
+    unsigned int bshift;
+    unsigned char *pd;
+    
+    if (!(bpp == 8 || bpp == 16 || bpp == 24 || bpp == 32)) return "Unsupported BPP value, expected: 8, 16, 24, or 32";
+
+    if (*dw == 0) {
+        // no sizes given, so supply our own
+        *dw = 32 * f->w;
+        *dh = 8 * f->h;
+    }
+    w = *dw;
+    h = *dh;
+
+    if (*dest == 0) {
+        // no bitmap memory supplied, so allocate our own
+        *dest = malloc(w * h * bpp >> 3);
+    }
+    pd = *dest;
+    // figure out line byte length (padding to 24 pixel blocks, packed into 4 eight bit ascii values)
+    if (fmod((double)w, 24.0) != 0.0)
+        llen = ((w / 24) + 1) * 4;
+    else
+        llen = w / 6;
+    blen = bpp >> 3;
+    // blow this thing up!
+    for (int y = 0; y < h; y++) {
+        // find the start of this line in our source data stream
+        const unsigned char *pl = ps + y * llen;
+        // scan the bits of this line
+        bshift = 0;
+        val = *pl - 48;
+        if (val < 0) val = 44;
+        for (int x = 0; x < w; x++) {
+            if (val & (1 << bshift)) 
+                memcpy(pd + ((y * w) + h) * blen, &on, blen);
+            else 
+                memcpy(pd + ((y * w) + h) * blen, &off, blen);
+            bshift++;
+            if (bshift == 6) {
+                bshift = 0;
+                pl++;
+                val = *pl - 48;
+                if (val < 0) val = 44;
+            }
+        }
+
+    }
+    return 0;
+}            
+]])
+    elseif lang == 'JSON' then
+        ti("{\n");
+        ti("\"name\": \"" .. self.name[self.nsel] .. "\",\n");
+        ti("\"width\": " .. tostring(self.wid) .. ",\n");
+        ti("\"height\": " .. tostring(self.size) .. ",\n");
+        ti("\"bits\":\n\t[\n");
+        local pos = 0
+        local bpos = 1
+        local v = 0
+        for y=1, h, 1 do
+            for x=1, w, 1 do
+                local pr, pg, pb, pa = id:getPixel(x-1, y-1)
+                if pa > 0.9 then
+                    v = v + bit.lshift(1,pos)
+                end
+                pos = pos + 1
+                if pos == 6 then
+                    if v + 48 == 0x5C then 
+                        l[bpos] = string.char(0x2F)
+                    else 
+                        l[bpos] = string.char(v + 48)
+                    end
+                    pos = 0
+                    v = 0
+                    bpos = bpos + 1
+                    if bpos == 121 then
+                        ti("\t\t\"" .. table.concat(l) .. "\",\n")
+                        bpos = 1
+                        l = {}
+                    end
+                end
+            end
+        end
+        if bpos > 1 then ti("\t\t\"" .. table.concat(l) .. "\",\n") end
+    ti("\t]\n}\n");
+    end
     return table.concat(t)
 end
+
 
 return fnt
 
