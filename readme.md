@@ -5,7 +5,7 @@ characters of a unicode ttf, and allows you to pack that into a lua source
 font file that draws the font (or a C language file, or a JSON data file). 
 This repo includes all the fonts of the [int10h Ultimate Oldschool PC Font Pack 2.2](https://int10h.org/oldschool-pc-fonts/).
 Given you have LÖVE installed on your desktop, you should be able to download and
-run the PC-8 Packer.love in the repo. It is built against 11.4, but I think it
+run the PC-8 Packer.love in the repo. It is built against 11.4, but it
 should work on 11.0 or better.
 
 ## Application Usage
