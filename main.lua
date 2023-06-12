@@ -10,7 +10,7 @@ io.stdout:setvbuf("no") -- let the output show in sublime text editor
 
 fnt = require 'fnt'
 
-usageA = "usage: <up>/<down> change font - <left>/<right> change size - <tab> change hinting - <space> emit lua font to clipboard"
+usageA = "usage: <up>/<down> change font - <left>/<right> change size - <tab> change hinting"
 usageB = "       <1..3> emit font to clipboard: 1 = lua, 2 = C, 3 = JSON"
 
 local function prnt(g, txt, x, y)

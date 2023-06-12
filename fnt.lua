@@ -11,6 +11,10 @@ require 'pc-8'
 local fnt = { list = {}, index = {}, name = {}, hopts = { 'normal', 'light', 'mono', 'none' }, 
         size = 16, hinting = 'none', dir = "/", wid = 8, cp437_native = true }
 
+local z85map = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.-:+=^!/*?&<>()[]{}@%$#"
+
+local z85inv = {} -- maps base85 digit ascii representation to their value
+for i = 1, #z85map do z85inv[string.byte(z85map, i, i)] = i - 1 end
 
 local function starts_with(str, start)
    return str:sub(1, #start) == start
@@ -105,6 +109,8 @@ fnt.emit = function(self, lang)
     love.graphics.setCanvas()
     local id = c:newImageData()
 
+    id:encode('png', "test.png")
+
     local t = {}
     local l = {}
     local function ti(str) table.insert(t, str) end
@@ -165,7 +171,7 @@ while (ppos < tpixel) do
     bpos = bpos + 1
     if bpos > cend then
         lpos = lpos + 1
-        if lpos < #fnt.bit then 
+        if lpos <= #fnt.bit then 
             cstr = fnt.bit[lpos]
             cend = cstr:len()
         end
@@ -414,25 +420,47 @@ const char* fnt_fill(const fnt *f, unsigned char **dest, int *dw, int *dh, unsig
             for x=1, w, 1 do
                 local pr, pg, pb, pa = id:getPixel(x-1, y-1)
                 if pa > 0.9 then
-                    v = v + bit.lshift(1,pos)
+                    v = v + bit.lshift(1, pos)
                 end
                 pos = pos + 1
-                if pos == 6 then
-                    if v + 48 == 0x5C then 
-                        l[bpos] = string.char(0x2F)
-                    else 
-                        l[bpos] = string.char(v + 48)
-                    end
+                if pos == 32 then
+                    local r1, r2, r3, r4, r5
+                    r5 = v % 85; v = math.floor(v / 85)
+                    r4 = v % 85; v = math.floor(v / 85)
+                    r3 = v % 85; v = math.floor(v / 85)
+                    r2 = v % 85; v = math.floor(v / 85)
+                    r1 = v % 85; v = math.floor(v / 85)
+                    l[bpos] = string.char(
+                            z85map:byte(r1 + 1),
+                            z85map:byte(r2 + 1),
+                            z85map:byte(r3 + 1),
+                            z85map:byte(r4 + 1),
+                            z85map:byte(r5 + 1))
                     pos = 0
                     v = 0
                     bpos = bpos + 1
-                    if bpos == 121 then
+                    if bpos == 20 then
                         ti("\t\t\"" .. table.concat(l) .. "\",\n")
                         bpos = 1
                         l = {}
                     end
                 end
             end
+        end
+        if pos > 0 then
+            local r1, r2, r3, r4, r5
+            r5 = v % 85; v = math.floor(v / 85)
+            r4 = v % 85; v = math.floor(v / 85)
+            r3 = v % 85; v = math.floor(v / 85)
+            r2 = v % 85; v = math.floor(v / 85)
+            r1 = v % 85; v = math.floor(v / 85)
+            l[bpos] = string.char(
+                    z85map:byte(r1 + 1),
+                    z85map:byte(r2 + 1),
+                    z85map:byte(r3 + 1),
+                    z85map:byte(r4 + 1),
+                    z85map:byte(r5 + 1))
+            bpos = bpos + 1
         end
         if bpos > 1 then ti("\t\t\"" .. table.concat(l) .. "\",\n") end
     ti("\t]\n}\n");
