@@ -8,6 +8,7 @@
 
 io.stdout:setvbuf("no") -- let the output show in sublime text editor
 
+
 fnt = require 'fnt'
 
 usageA = "usage: <up>/<down> change font - <left>/<right> change size - <tab> change hinting"
