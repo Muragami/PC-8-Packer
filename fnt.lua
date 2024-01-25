@@ -130,7 +130,6 @@ fnt.emit = function(self, lang)
     -- first draw to a canvas so we can get the texture later
     local w = 32 * (self.wid + 1)
     local h = 8 * self.size
-    if math.fmod(w, 24) > 0 then w = (math.floor(w / 24) + 1) * 24 end -- make sure we are 24 pixel aligned for our encoding below!
     local c = love.graphics.newCanvas(w, h)
     love.graphics.setCanvas(c)
     self:draw(0, 0, 1.0)
@@ -159,7 +158,6 @@ fnt.emit = function(self, lang)
         ti("\t} }\n")
         ti([[
 local w, h = 32 * (fnt.width+1), 8 * fnt.height
-if math.fmod(w,24) > 0 then w = (math.floor(w/24) + 1) * 24 end
 local id = love.image.newImageData(w, h)
 local x, y, lpos, bpos, tpixel, ppos = 0, 0, 1, 1, w*h, 0
 local cstr = love.data.decode('string', 'base64', fnt.bit_data[lpos])
