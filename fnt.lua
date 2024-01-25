@@ -11,11 +11,6 @@ require 'pc-8'
 local fnt = { list = {}, index = {}, name = {}, hopts = { 'normal', 'light', 'mono', 'none' }, 
         size = 16, hinting = 'none', dir = "/", wid = 8, cp437_native = true }
 
-local z85map = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.-:+=^!/*?&<>()[]{}@%$#"
-
-local z85inv = {} -- maps base85 digit ascii representation to their value
-for i = 1, #z85map do z85inv[string.byte(z85map, i, i)] = i - 1 end
-
 local function starts_with(str, start)
    return str:sub(1, #start) == start
 end
@@ -95,6 +90,39 @@ fnt.draw = function(self,dx,dy,scale)
     end
 end
 
+function pixelsToBits(w, h, id)
+    local str = {}
+    local pos = 0       -- bit position to set
+    local v = 0         -- current byte value
+    for y=1, h, 1 do
+        for x=1, w, 1 do
+            local pr, pg, pb, pa = id:getPixel(x - 1, y - 1)
+            if pa > 0.9 then
+                v = v + bit.lshift(1, pos)
+            end
+            pos = pos + 1
+            if pos == 8 then
+                table.insert(str, string.char(v))
+                pos = 0
+                v = 0
+            end
+        end
+    end
+    -- last byte? if so, add it
+    if pos > 0 then table.insert(str, v) end
+    return table.concat(str)
+end
+
+function b64pixels(w, h, id)
+    local bits = pixelsToBits(w, h, id)
+    return love.data.encode('string', 'base64', bits)
+end
+
+function next80chars(str, start)
+    if start >= #str then return false end
+    return str:sub(start, start + 80)
+end
+
 -- emit a lua file for this font!
 fnt.emit = function(self, lang)
     -- make sure we are in mono mode
@@ -117,62 +145,42 @@ fnt.emit = function(self, lang)
 
     if lang == 'lua' then
         ti("local fnt = { name = '" .. self.sel .. "', height = " .. tostring(self.size) .. ", width = " .. tostring(self.wid) .. ", \n")
-        ti("\tbit = {\n")
-        local pos = 0
-        local bpos = 1
-        local v = 0
-        for y=1, h, 1 do
-            for x=1, w, 1 do
-                local pr, pg, pb, pa = id:getPixel(x-1, y-1)
-                if pa > 0.9 then
-                    v = v + bit.lshift(1,pos)
-                end
-                pos = pos + 1
-                if pos == 6 then
-                    if v + 48 == 0x5C then 
-                        l[bpos] = string.char(0x2F)
-                    else 
-                        l[bpos] = string.char(v + 48)
-                    end
-                    pos = 0
-                    v = 0
-                    bpos = bpos + 1
-                    if bpos == 121 then
-                        ti("\t'" .. table.concat(l) .. "',\n")
-                        bpos = 1
-                        l = {}
-                    end
-                end
+        ti("\tbit_encoding = 'BASE64', bit_data = {\n")
+        local data = b64pixels(w, h, id)
+        local lpos = 1
+        local line = true
+        while line do
+            line = next80chars(data, lpos)
+            lpos = lpos + 80
+            if line then
+                ti("\t'" .. line .. "',\n")
             end
         end
-        if bpos > 1 then ti("\t'" .. table.concat(l) .. "',\n") end
         ti("\t} }\n")
         ti([[
 local w, h = 32 * (fnt.width+1), 8 * fnt.height
 if math.fmod(w,24) > 0 then w = (math.floor(w/24) + 1) * 24 end
 local id = love.image.newImageData(w, h)
 local x, y, lpos, bpos, tpixel, ppos = 0, 0, 1, 1, w*h, 0
-local cstr = fnt.bit[lpos]
+local cstr = love.data.decode('string', 'base64', fnt.bit_data[lpos])
 local cend = cstr:len()
 
 while (ppos < tpixel) do
     local v = cstr:byte(bpos,bpos)
-    if v == 0x2F then v = 0x5C end
-    v = v - 48
-    for i = 1, 6, 1 do
-        if bit.band(v,bit.lshift(1,i-1)) > 0 then id:setPixel(x, y, 1.0, 1.0, 1.0, 1.0) end
+    for i = 0, 7, 1 do
+        if bit.band(v, bit.lshift(1, i)) > 0 then id:setPixel(x, y, 1.0, 1.0, 1.0, 1.0) end
         x = x + 1
         if x == w then
             x = 0
             y = y + 1
         end
     end
-    ppos = ppos + 6
+    ppos = ppos + 8
     bpos = bpos + 1
     if bpos > cend then
         lpos = lpos + 1
-        if lpos <= #fnt.bit then 
-            cstr = fnt.bit[lpos]
+        if lpos <= #fnt.bit_data then 
+            cstr = love.data.decode('string', 'base64', fnt.bit_data[lpos])
             cend = cstr:len()
         end
         bpos = 1
@@ -322,148 +330,36 @@ typedef struct _fnt {
 
 ]])
         ti("const fnt " .. self.name[self.nsel] .. " = { (unsigned char*)\n")
-        local pos = 0
-        local bpos = 1
-        local v = 0
-        for y=1, h, 1 do
-            for x=1, w, 1 do
-                local pr, pg, pb, pa = id:getPixel(x-1, y-1)
-                if pa > 0.9 then
-                    v = v + bit.lshift(1,pos)
-                end
-                pos = pos + 1
-                if pos == 6 then
-                    if v + 48 == 0x5C then 
-                        l[bpos] = string.char(0x2F)
-                    else 
-                        l[bpos] = string.char(v + 48)
-                    end
-                    pos = 0
-                    v = 0
-                    bpos = bpos + 1
-                    if bpos == 121 then
-                        ti("\t\"" .. table.concat(l) .. "\"\n")
-                        bpos = 1
-                        l = {}
-                    end
-                end
+        local data = b64pixels(w, h, id)
+        local lpos = 1
+        local line = true
+        while line do
+            line = next80chars(data, lpos)
+            lpos = lpos + 80
+            if line then
+                ti("\t\"" .. line .. "\"\n")
             end
         end
-        if bpos > 1 then ti("\t\"" .. table.concat(l) .. "\"\n") end
         ti("\t, " .. tostring(self.wid) .. "\n")
         ti("\t, " .. tostring(self.size) .. " };\n\n")
-        ti([[
-const char* fnt_fill(const fnt *f, unsigned char **dest, int *dw, int *dh, unsigned int on, unsigned int off, unsigned int bpp)
-{
-    const unsigned char *ps = f->bits;
-    int w, h, llen, blen, val;
-    unsigned int bshift;
-    unsigned char *pd;
-    
-    if (!(bpp == 8 || bpp == 16 || bpp == 24 || bpp == 32)) return "Unsupported BPP value, expected: 8, 16, 24, or 32";
-
-    if (*dw == 0) {
-        // no sizes given, so supply our own
-        *dw = 32 * f->w;
-        *dh = 8 * f->h;
-    }
-    w = *dw;
-    h = *dh;
-
-    if (*dest == 0) {
-        // no bitmap memory supplied, so allocate our own
-        *dest = malloc(w * h * bpp >> 3);
-    }
-    pd = *dest;
-    // figure out line byte length (padding to 24 pixel blocks, packed into 4 eight bit ascii values)
-    if (fmod((double)w, 24.0) != 0.0)
-        llen = ((w / 24) + 1) * 4;
-    else
-        llen = w / 6;
-    blen = bpp >> 3;
-    // blow this thing up!
-    for (int y = 0; y < h; y++) {
-        // find the start of this line in our source data stream
-        const unsigned char *pl = ps + y * llen;
-        // scan the bits of this line
-        bshift = 0;
-        val = *pl - 48;
-        if (val < 0) val = 44;
-        for (int x = 0; x < w; x++) {
-            if (val & (1 << bshift)) 
-                memcpy(pd + ((y * w) + h) * blen, &on, blen);
-            else 
-                memcpy(pd + ((y * w) + h) * blen, &off, blen);
-            bshift++;
-            if (bshift == 6) {
-                bshift = 0;
-                pl++;
-                val = *pl - 48;
-                if (val < 0) val = 44;
-            }
-        }
-
-    }
-    return 0;
-}            
-]])
     elseif lang == 'JSON' then
         ti("{\n");
         ti("\"name\": \"" .. self.name[self.nsel] .. "\",\n");
         ti("\"width\": " .. tostring(self.wid) .. ",\n");
         ti("\"height\": " .. tostring(self.size) .. ",\n");
-        ti("\"bits\":\n\t[\n");
-        local pos = 0
-        local bpos = 1
-        local v = 0
-        for y=1, h, 1 do
-            for x=1, w, 1 do
-                local pr, pg, pb, pa = id:getPixel(x-1, y-1)
-                if pa > 0.9 then
-                    v = v + bit.lshift(1, pos)
-                end
-                pos = pos + 1
-                if pos == 32 then
-                    local r1, r2, r3, r4, r5
-                    r5 = v % 85; v = math.floor(v / 85)
-                    r4 = v % 85; v = math.floor(v / 85)
-                    r3 = v % 85; v = math.floor(v / 85)
-                    r2 = v % 85; v = math.floor(v / 85)
-                    r1 = v % 85; v = math.floor(v / 85)
-                    l[bpos] = string.char(
-                            z85map:byte(r1 + 1),
-                            z85map:byte(r2 + 1),
-                            z85map:byte(r3 + 1),
-                            z85map:byte(r4 + 1),
-                            z85map:byte(r5 + 1))
-                    pos = 0
-                    v = 0
-                    bpos = bpos + 1
-                    if bpos == 20 then
-                        ti("\t\t\"" .. table.concat(l) .. "\",\n")
-                        bpos = 1
-                        l = {}
-                    end
-                end
+        ti("\"bit_encoding\": \"BASE64\",\n");
+        ti("\"bit_data\":\n\t[\n");
+        local data = b64pixels(w, h, id)
+        local lpos = 1
+        local line = true
+        while line do
+            line = next80chars(data, lpos)
+            lpos = lpos + 80
+            if line then
+                ti("\t\"" .. line .. "\",\n")
             end
         end
-        if pos > 0 then
-            local r1, r2, r3, r4, r5
-            r5 = v % 85; v = math.floor(v / 85)
-            r4 = v % 85; v = math.floor(v / 85)
-            r3 = v % 85; v = math.floor(v / 85)
-            r2 = v % 85; v = math.floor(v / 85)
-            r1 = v % 85; v = math.floor(v / 85)
-            l[bpos] = string.char(
-                    z85map:byte(r1 + 1),
-                    z85map:byte(r2 + 1),
-                    z85map:byte(r3 + 1),
-                    z85map:byte(r4 + 1),
-                    z85map:byte(r5 + 1))
-            bpos = bpos + 1
-        end
-        if bpos > 1 then ti("\t\t\"" .. table.concat(l) .. "\",\n") end
-    ti("\t]\n}\n");
+        ti("\t]\n}\n");
     end
     return table.concat(t)
 end
