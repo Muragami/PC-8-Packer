@@ -9,7 +9,7 @@
 require 'pc-8'
 
 local fnt = { list = {}, index = {}, name = {}, hopts = { 'normal', 'light', 'mono', 'none' }, 
-        size = 16, hinting = 'none', dir = "/", wid = 8, cp437_native = true }
+        size = 16, hinting = 'none', dir = "/", wid = 8, cp437_native = true, vshift = 0 }
 
 local function starts_with(str, start)
    return str:sub(1, #start) == start
@@ -19,7 +19,7 @@ local function ends_with(str, ending)
    return ending == "" or str:sub(-#ending) == ending
 end
 
-fnt.load = function(self,dir)
+fnt.load = function(self, dir)
     local files = love.filesystem.getDirectoryItems(dir)
     for k, file in ipairs(files) do
         if ends_with(file,".ttf") then
@@ -33,6 +33,8 @@ end
 
 fnt.build = function(self)
     self.font = love.graphics.newFont(self.sel, self.size, self.hinting)
+    self.font:setFilter('nearest')
+    self.grid = nil
     -- figure the max width
     local mwid = 0
     for i = 1, 256,1 do
@@ -40,9 +42,10 @@ fnt.build = function(self)
         if w > mwid then mwid = w end
     end
     self.wid = mwid
+    self:create()
 end
 
-fnt.select = function(self,x)
+fnt.select = function(self, x)
     local sel
     if type(x) == 'number' then
         sel = self.list[x]
@@ -56,12 +59,12 @@ fnt.select = function(self,x)
     end
 end
 
-fnt.setSize = function(self,x)
+fnt.setSize = function(self, x)
     self.size = x
     self:build()
 end
 
-fnt.setHinting = function(self,x)
+fnt.setHinting = function(self, x)
     if type(x) == 'number' then
         self.hinting = self.hopts[x]
     else
@@ -70,23 +73,56 @@ fnt.setHinting = function(self,x)
     self:build()
 end
 
-fnt.draw = function(self,dx,dy,scale)
-    local s = scale or 1.0
+fnt.shift = function(self, p)
+    self.vshift = self.vshift + p
+    self:create()
+end
+
+fnt.create = function(self)
     local g = love.graphics
-
-    if not self.font then return end
-
+    if self.fcanvas then self.fcanvas:release() end
+    self.fcanvas = g.newCanvas(w, h)
+    self.fcanvas:setFilter('nearest')
     g.setFont(self.font)
-
+    g.setCanvas(self.fcanvas)
     local i = 0
     for y = 1, 8, 1 do
-        local ddx = dx
-        local ddy = dy + ((y-1) * (self.size) * s)
+        local ddx = 0
+        local ddy = (y - 1) * self.size
         for x = 1, 32, 1 do
-            love.graphics.print(pc8_to_utf8(i), ddx, ddy, 0, s, s)
+            g.print(pc8_to_utf8(i), ddx, ddy + self.vshift)
             i = i + 1
-            ddx = ddx + ((self.wid+1) * s)
+            ddx = ddx + self.wid
         end
+    end
+    g.setCanvas()
+end
+
+fnt.draw = function(self, dx, dy, nogrid, scale)
+    local s = scale or 1.0
+    local g = love.graphics
+    if not self.font then return end
+    g.draw(self.fcanvas, dx, dy, 0, s, s)
+    if nogrid ~= true then
+        if not self.grid then
+            local w = 32 * self.wid
+            local h = 8 * self.size
+            local id = love.image.newImageData(w, h)
+            for x = 0, 31, 1 do
+                for y = 0, h-1, 1 do
+                    id:setPixel(x * self.wid, y, 0, 1.0, 0, 0.5)
+                end
+            end
+            for y = 0, 7, 1 do
+                for x = 0, w-1, 1 do
+                    id:setPixel(x, y * self.size, 0, 1.0, 0, 0.5)
+                end
+            end
+            self.grid = love.graphics.newImage(id)
+            self.grid:setFilter('nearest')
+        end
+
+        g.draw(self.grid, dx, dy, 0, s, s)
     end
 end
 
@@ -128,11 +164,11 @@ fnt.emit = function(self, lang)
     -- make sure we are in mono mode
     self:setHinting(3)
     -- first draw to a canvas so we can get the texture later
-    local w = 32 * (self.wid + 1)
+    local w = 32 * self.wid
     local h = 8 * self.size
     local c = love.graphics.newCanvas(w, h)
     love.graphics.setCanvas(c)
-    self:draw(0, 0, 1.0)
+    self:draw(0, 0, true)
     love.graphics.setCanvas()
     local id = c:newImageData()
 
@@ -157,7 +193,7 @@ fnt.emit = function(self, lang)
         end
         ti("\t} }\n")
         ti([[
-local w, h = 32 * (fnt.width+1), 8 * fnt.height
+local w, h = 32 * fnt.width + 1, 8 * fnt.height
 local id = love.image.newImageData(w, h)
 local x, y, lpos, bpos, tpixel, ppos = 0, 0, 1, 1, w*h, 0
 local cstr = love.data.decode('string', 'base64', fnt.bit_data[lpos])
@@ -197,7 +233,7 @@ local fw, fh = fnt.width, fnt.height
 local i = 0
 for y=1, 8, 1 do
     for x = 1, 32, 1 do
-        fnt.quad[i] = love.graphics.newQuad((fw+1) * (x-1), fh * (y-1), fw, fh, w, h )
+        fnt.quad[i] = love.graphics.newQuad(fw * (x-1), fh * (y-1), fw, fh, w, h )
         i = i + 1
     end
 end
