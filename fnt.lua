@@ -132,9 +132,9 @@ local function pixelsToBytes(w, h, id, i)
     local v = 0
     local dx = (math.fmod(i, 32) * w)
     local dy = (math.floor(i / 32) * h)
-    for y=dy, h-1, 1 do
-        for x=dx, w-1, 1 do
-            local pr, pg, pb, pa = id:getPixel(x - 1, y - 1)
+    for y=dy, dy+h-1, 1 do
+        for x=dx, dx+w-1, 1 do
+            local pr, pg, pb, pa = id:getPixel(x, y)
             if pa > 0.9 then
                 v = v + bit.lshift(1, pos)
             end
