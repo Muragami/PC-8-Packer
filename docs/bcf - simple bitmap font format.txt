@@ -1,0 +1,41 @@
+output this font into a standard format: (.bcf)
+
+	The file format is a 8 byte header: 4 character file if, 
+	2 bytes that record the amount of characters contained,
+	a byte that is the width of the characters,
+	a byte that is the height of the characters, as so:
+
+	XXXX XX   X  X  
+	BCFF -1   -2 -3 
+	BCFV -1   -2 -3 
+
+	BCFF: Binary Character Font Fixed
+	BCFV: Binary Character Font Variable (width)
+
+	-1: num characters contained, lower byte first, two bytes (65535 characters allowed)
+	-2: width of each character in bits (maximum width for variable width)
+	-3: heights of each character in lines
+	
+BCFF: (fixed width characters)
+	After that header in a 'BCFF' id file, we have an array of
+	UTF-8 encoded characters, equal to the value [-1] above.
+
+	After that array, there is the character bits in sequence:
+		width bits to bytes (round up) x lines bytes per character
+		lines top to bottom, lower bytes first
+
+BCFV: (variable width characters)
+	After that header in a 'BCFV' id file, we have an array
+	of single byte character widths, in length equal to [-1] above bytes.
+
+	After that array, we have an array of
+	UTF-8 encoded characters, equal to the value [-1] above.
+
+	After that array, there is the character bits in sequence:
+		width bits to bytes (round up) x lines bytes per character
+		lines top to bottom, lower bytes first
+		
+Some simple file format limitations:
+	255 width, 255 height character bitmaps
+	bitmaps only 1 bit deep, plot or don't plot only
+	65535 characters in total

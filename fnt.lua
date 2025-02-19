@@ -126,7 +126,35 @@ fnt.draw = function(self, dx, dy, nogrid, scale)
     end
 end
 
-function pixelsToBits(w, h, id)
+local function pixelsToBytes(w, h, id, i)
+    local str = {}
+    local pos = 0
+    local v = 0
+    local dx = (math.fmod(i, 32) * w) + 1
+    local dy = (math.floor(i / 32) * h) + 1
+    for y=1, h, 1 do
+        for x=1, w, 1 do
+            local pr, pg, pb, pa = id:getPixel(x - 1, y - 1)
+            if pa > 0.9 then
+                v = v + bit.lshift(1, pos)
+            end
+            pos = pos + 1
+            if pos == 8 then
+                table.insert(str, string.char(v))
+                pos = 0
+                v = 0
+            end
+        end
+        if pos > 0 then
+            table.insert(str, string.char(v))
+            pos = 0
+            v = 0
+        end
+    end
+    return table.concat(str)
+end
+
+local function pixelsToBits(w, h, id)
     local str = {}
     local pos = 0       -- bit position to set
     local v = 0         -- current byte value
@@ -149,12 +177,12 @@ function pixelsToBits(w, h, id)
     return table.concat(str)
 end
 
-function b64pixels(w, h, id)
+local function b64pixels(w, h, id)
     local bits = pixelsToBits(w, h, id)
     return love.data.encode('string', 'base64', bits)
 end
 
-function next80chars(str, start)
+local function next80chars(str, start)
     if start >= #str then return false end
     return str:sub(start, start + 80)
 end
@@ -398,6 +426,36 @@ typedef struct _fnt {
     return table.concat(t)
 end
 
+fnt.save = function(self)
+    -- make sure we are in mono mode
+    self:setHinting(3)
+    -- first draw to a canvas so we can get the texture later
+    local c = love.graphics.newCanvas(w, h)
+    love.graphics.setCanvas(c)
+    self:draw(0, 0, true)
+    love.graphics.setCanvas()
+    local id = c:newImageData()
+    -- now let's make the file
+    local lf = love.filesystem
+    local f = lf.newFile(self.name[self.nsel] .. '_' .. string.format('%d',self.size) .. '.bcf')
+    f:open("w")
+    -- 8 byte header
+    f:write("BCFF")                 -- id chars
+    f:write("\xFF\x00")             -- # contained chars in 16-bit (256)
+    f:write(string.char(self.wid))  -- byte character width
+    f:write(string.char(self.size)) -- byte character height
+    -- 256 contained characters
+    for i = 0, 255, 1 do
+        f:write(string.char(i))
+    end
+    -- bitmaps for the characters
+    local wbytes = math.floor((self.wid + 7) / 8)
+    for i = 0, 255, 1 do
+        f:write(pixelsToBytes(self.wid, self.size, id, i))
+    end
+    -- all done
+    f:close()
+end
 
 return fnt
 

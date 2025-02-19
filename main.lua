@@ -15,7 +15,7 @@ scale = 1
 
 usageA = "usage: <up>/<down> change font - <left>/<right> change size - <tab> change hinting <1..3>"
 usageA = usageA .. " emit font to clipboard: 1 = lua, 2 = C, 3 = JSON"
-usageB = "       . shift down a pixel , shift up a pixel"
+usageB = "       . shift down a pixel , shift up a pixel <space> toggle scale <return> save .bcf"
 
 local function prnt(g, txt, x, y)
     g.setColor(0.0, 0.0, 0.0, 1.0)
@@ -32,7 +32,6 @@ function love.load()
     hs = 4
     fnt:select(snum)
     guiFont = love.graphics.newFont("font/Mx437_Compaq_Port3.ttf", 16)
-
 end
 
 function love.update(dt)
@@ -99,8 +98,10 @@ function love.keypressed(key, scancode, isrepeat )
         love.system.setClipboardText(fnt:emit('C'))
     elseif key == '3' then
         love.system.setClipboardText(fnt:emit('JSON'))
+    elseif key == 'return' then
+        fnt:save()
     elseif key == 'space' then
-        if scale == 1 then scale = 4
+        if scale == 1 then scale = 3
         else scale = 1 end
     end
 end
