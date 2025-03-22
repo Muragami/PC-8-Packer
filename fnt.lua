@@ -154,8 +154,27 @@ local function pixelsToBytes(w, h, id, i)
     return table.concat(str)
 end
 
+local function bitsToPixels(str, w, h, id)
+    local pos = 0 
+    local bpos = 1
+    local v = str:byte(bpos, bpos)
+    for y=1, h, 1 do
+        for x=1, w, 1 do
+            if bit.band(v, bit.lshift(1, pos)) > 0 then
+                id:setPixel(x - 1, y - 1, 1, 1, 1, 1)
+            end
+            pos = pos + 1
+            if pos == 8 then
+                bpos = bpos + 1
+                v = str:byte(bpos, bpos)
+                pos = 0
+            end
+        end
+    end
+end
+
 local function pixelsToBits(w, h, id)
-    local str = {}
+    local ret = ''
     local pos = 0       -- bit position to set
     local v = 0         -- current byte value
     for y=1, h, 1 do
@@ -166,26 +185,32 @@ local function pixelsToBits(w, h, id)
             end
             pos = pos + 1
             if pos == 8 then
-                table.insert(str, string.char(v))
+                ret = ret .. string.char(v)
                 pos = 0
                 v = 0
             end
         end
     end
     -- last byte? if so, add it
-    if pos > 0 then table.insert(str, v) end
-    return table.concat(str)
+    if pos > 0 then ret = ret .. string.char(v) end
+    return ret
 end
 
 local function b64pixels(w, h, id)
-    local bits = pixelsToBits(w, h, id)
-    return love.data.encode('string', 'base64', bits)
+    local data = pixelsToBits(w, h, id)
+    return love.data.encode('string', 'base64', data)
+end
+
+local function pixels64(str)
+    return love.data.decode('string', 'base64', str)
 end
 
 local function next80chars(str, start)
     if start >= #str then return false end
-    return str:sub(start, start + 80)
+    return str:sub(start, start + 79)
 end
+
+local function zero(x,y, r,g,b,a) return 0,0,0,0 end
 
 -- emit a lua file for this font!
 fnt.emit = function(self, lang)
@@ -200,8 +225,7 @@ fnt.emit = function(self, lang)
     love.graphics.setCanvas()
     local id = c:newImageData()
 
-    id:encode('png', "test.png")
-
+    local data = b64pixels(w, h, id)
     local t = {}
     local l = {}
     local function ti(str) table.insert(t, str) end
@@ -209,7 +233,6 @@ fnt.emit = function(self, lang)
     if lang == 'lua' then
         ti("local fnt = { name = '" .. self.sel .. "', height = " .. tostring(self.size) .. ", width = " .. tostring(self.wid) .. ", \n")
         ti("\tbit_encoding = 'BASE64', bit_data = {\n")
-        local data = b64pixels(w, h, id)
         local lpos = 1
         local line = true
         while line do
@@ -221,33 +244,28 @@ fnt.emit = function(self, lang)
         end
         ti("\t} }\n")
         ti([[
-local w, h = 32 * fnt.width + 1, 8 * fnt.height
+local w, h = 32 * fnt.width, 8 * fnt.height
 local id = love.image.newImageData(w, h)
-local x, y, lpos, bpos, tpixel, ppos = 0, 0, 1, 1, w*h, 0
-local cstr = love.data.decode('string', 'base64', fnt.bit_data[lpos])
-local cend = cstr:len()
-
-while (ppos < tpixel) do
-    local v = cstr:byte(bpos,bpos)
-    for i = 0, 7, 1 do
-        if bit.band(v, bit.lshift(1, i)) > 0 then id:setPixel(x, y, 1.0, 1.0, 1.0, 1.0) end
-        x = x + 1
-        if x == w then
-            x = 0
-            y = y + 1
+local hdata = table.concat(fnt.bit_data)
+local cstr = love.data.decode('string', 'base64', hdata)
+local pos = 0 
+local bpos = 1
+local v = cstr:byte(bpos, bpos)
+for y=1, h, 1 do
+    for x=1, w, 1 do
+        if bit.band(v, bit.lshift(1, pos)) > 0 then
+            id:setPixel(x - 1, y - 1, 1, 1, 1, 1)
         end
-    end
-    ppos = ppos + 8
-    bpos = bpos + 1
-    if bpos > cend then
-        lpos = lpos + 1
-        if lpos <= #fnt.bit_data then 
-            cstr = love.data.decode('string', 'base64', fnt.bit_data[lpos])
-            cend = cstr:len()
+        pos = pos + 1
+        if pos == 8 then
+            bpos = bpos + 1
+            v = cstr:byte(bpos, bpos)
+            pos = 0
         end
-        bpos = 1
     end
 end
+
+cstr = nil
 
 fnt.img = love.graphics.newImage(id)
 -- the 16 color CGA palette is built in (but can be altered or replaced)
