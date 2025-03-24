@@ -427,8 +427,10 @@ typedef struct _fnt {
         ti("\"name\": \"" .. self.name[self.nsel] .. "\",\n");
         ti("\"width\": " .. tostring(self.wid) .. ",\n");
         ti("\"height\": " .. tostring(self.size) .. ",\n");
-        ti("\"bit_encoding\": \"BASE64\",\n");
-        ti("\"bit_data\":\n\t[\n");
+        ti("\"type\": \"fnt.bcff\",\n");
+        ti("\"data_type\": \"1BIT_IMAGE\",\n");
+        ti("\"data_encoding\": \"BASE64\",\n");
+        ti("\"data\":\n\t[\n");
         local data = b64pixels(w, h, id)
         local lpos = 1
         local line = true
